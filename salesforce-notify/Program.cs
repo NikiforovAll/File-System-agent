@@ -17,7 +17,7 @@ namespace salesforce_notify
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new SalesforceNotify());
+            Application.Run(new SalesforceFileAgent());
         }
     }
 }
