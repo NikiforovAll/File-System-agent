@@ -10,11 +10,18 @@ using System.Windows.Forms;
 
 namespace salesforce_notify
 {
-    public partial class Form1 : Form
+    public partial class SalesforceNotifyForm: Form
     {
-        public Form1()
+        public Server Server { get; private set; }
+        public SalesforceNotifyForm()
         {
             InitializeComponent();
         }
+
+        private void SalesforceNotifyForm_Load(object sender, EventArgs args)
+        {
+            //Server.Start();   
+        }
+
     }
 }
