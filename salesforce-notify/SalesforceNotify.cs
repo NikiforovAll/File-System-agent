@@ -60,7 +60,6 @@ namespace salesforce_notify
                     }
                 }
                 NotifyUserBalloon(_trayIcon, $"{pathOrigin} : {path}");
-
             });
         }
 

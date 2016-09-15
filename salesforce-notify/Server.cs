@@ -38,12 +38,13 @@ namespace salesforce_notify
 
         private void Listen(Action<HttpListenerContext> func)
         {
-            var result = _httpListener.BeginGetContext(ListenerCallback, func);
-            result.AsyncWaitHandle.WaitOne();
+            _httpListener.BeginGetContext(ListenerCallback, func);
+            //result.AsyncWaitHandle.WaitOne();
         }
 
         private void ListenerCallback(IAsyncResult result)
         {
+            if (!_httpListener.IsListening) return;
             var func = result.AsyncState as Action<HttpListenerContext>;
             func?.Invoke(_httpListener.EndGetContext(result));
             Listen(func);
