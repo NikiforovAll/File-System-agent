@@ -34,6 +34,8 @@ namespace salesforce_fileagent
                     path = operationResult.Item1;
                     pathOrigin = operationResult.Item2;
                 }
+                listnerContext.Response.StatusCode = 200;
+                listnerContext.Response.Close();
                 NotifyUserBalloon(_trayIcon, $"{pathOrigin} {path}");
             });
         }
@@ -145,6 +147,7 @@ namespace salesforce_fileagent
         private void Exit(object sender, EventArgs args)
         {
             _trayIcon.Visible = false;
+            _userSettings.Save();
             Application.Exit();
         }
 
