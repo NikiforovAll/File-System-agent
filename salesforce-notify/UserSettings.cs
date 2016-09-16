@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Configuration;
 
-namespace salesforce_notify
+namespace salesforce_fileagent
 {
     class UserSettings: ApplicationSettingsBase
     {
-        [UserScopedSettingAttribute()]
-        [DefaultSettingValueAttribute("8125")]
+        [UserScopedSetting()]
+        [DefaultSettingValue("8125")]
         public string Port
         {
             get { return (string)(this["Port"]); }

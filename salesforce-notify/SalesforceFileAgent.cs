@@ -1,13 +1,13 @@
 ﻿using System;
-using System.Windows.Forms;
-using salesforce_notify.Properties;
 using System.Configuration;
 using System.Drawing;
+using System.IO;
 using System.Net;
 using System.Web;
-using System.IO;
+using System.Windows.Forms;
+using salesforce_fileagent.Properties;
 
-namespace salesforce_notify
+namespace salesforce_fileagent
 {
     public class SalesforceFileAgent : ApplicationContext
     {

@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace salesforce_notify
+﻿namespace salesforce_fileagent
 {
     partial class SalesforceNotifyForm
     {

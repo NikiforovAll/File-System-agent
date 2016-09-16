@@ -1,9 +1,9 @@
 ﻿using System;
+using System.Configuration;
 using System.Security.Principal;
 using Microsoft.Win32;
-using System.Configuration;
 
-namespace salesforce_notify
+namespace salesforce_fileagent
 {
     public static class StartUpManager
     {
