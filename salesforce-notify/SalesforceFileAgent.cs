@@ -11,12 +11,37 @@ namespace salesforce_notify
 {
     public class SalesforceFileAgent : ApplicationContext
     {
-        private readonly NotifyIcon _trayIcon;
+        private NotifyIcon _trayIcon;
         private readonly Server _server;
+        private readonly UserSettings _userSettings;
         public SalesforceFileAgent()
         {
+            InitializeComponent();
+            _userSettings = new UserSettings();
+            _server = new Server($"{ConfigurationManager.AppSettings["listner-prefix"]}:{_userSettings.Port}/");
+            _server.Start(listnerContext =>
+            {
+                HttpListenerRequest request = listnerContext.Request;
+                var urlKeyValueParameters = request.Url.ParseQueryString();
+                string path, pathOrigin = null;
+                if (!urlKeyValueParameters.TryGetValue("path", out path))
+                {
+                    path = "Parameter \"path\" was not found...";
+                }
+                else
+                {
+                    var operationResult = OpenFileSystemItem(path);
+                    path = operationResult.Item1;
+                    pathOrigin = operationResult.Item2;
+                }
+                NotifyUserBalloon(_trayIcon, $"{pathOrigin} {path}");
+            });
+        }
+
+        private void InitializeComponent()
+        {
             const int TRAY_WIDTH = 120;
-            const int TRAY_HEIGHT = 88; 
+            const int TRAY_HEIGHT = 88;
             var contextMenuStrip = new ContextMenuStrip
             {
                 Items =
@@ -60,31 +85,13 @@ namespace salesforce_notify
                 Visible = true,
                 ContextMenuStrip = contextMenuStrip
             };
-//            _startupManager = new StartupManager(ConfigurationManager.AppSettings["salesforce-fileagent"]);
+            //            _startupManager = new StartupManager(ConfigurationManager.AppSettings["salesforce-fileagent"]);
             _trayIcon.MouseClick += ToggleServerStatus;
-            _server = new Server(ConfigurationManager.AppSettings["listner-prefix"]);
-            _server.Start(listnerContext =>
-            {
-                HttpListenerRequest request = listnerContext.Request;
-                var urlKeyValueParameters = request.Url.ParseQueryString();
-                string path, pathOrigin = null;
-                if (!urlKeyValueParameters.TryGetValue("path", out path))
-                {
-                    path = "url is invalid";
-                }
-                else
-                {
-                    var operationResult = OpenFileSystemItem(path);
-                    path = operationResult.Item1;
-                    pathOrigin = operationResult.Item2;
-                }
-                NotifyUserBalloon(_trayIcon, $"{pathOrigin} {path}");
-            });
         }
 
         private void ToggleServerStatus(object sender, MouseEventArgs e)
         {
-            if(e.Button != MouseButtons.Left)
+            if (e.Button != MouseButtons.Left)
                 return;
             if (_server.IsRunning)
             {
@@ -108,7 +115,7 @@ namespace salesforce_notify
             string pathOrigin;
             path = HttpUtility.UrlDecode(path);
             Console.WriteLine(path);
-            if (IsItemExists(out pathOrigin, path))
+            if (IsFileSystemItemExists(out pathOrigin, path))
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
                 {
@@ -123,7 +130,7 @@ namespace salesforce_notify
             }
             return new Tuple<string, string>(path, pathOrigin);
         }
-        private bool IsItemExists(out string type, string path)
+        private bool IsFileSystemItemExists(out string type, string path)
         {
             path = path
                 .Replace("\"", "")
