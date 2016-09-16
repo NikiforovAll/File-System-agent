@@ -13,7 +13,6 @@ namespace salesforce_notify
     {
         private readonly NotifyIcon _trayIcon;
         private readonly Server _server;
-        private readonly StartupManager _startupManager;
         public SalesforceFileAgent()
         {
             const int TRAY_WIDTH = 120;
@@ -61,7 +60,7 @@ namespace salesforce_notify
                 Visible = true,
                 ContextMenuStrip = contextMenuStrip
             };
-            _startupManager = new StartupManager(ConfigurationManager.AppSettings["salesforce-fileagent"]);
+//            _startupManager = new StartupManager(ConfigurationManager.AppSettings["salesforce-fileagent"]);
             _trayIcon.MouseClick += ToggleServerStatus;
             _server = new Server(ConfigurationManager.AppSettings["listner-prefix"]);
             _server.Start(listnerContext =>
@@ -156,11 +155,29 @@ namespace salesforce_notify
 
         private void EnableAppStartup(object sender, EventArgs args)
         {
-            _startupManager.Enable();
+            if (StartUpManager.IsUserAdministrator())
+            {
+                StartUpManager.AddApplicationToAllUserStartup();
+            }
+            else
+            {
+                StartUpManager.AddApplicationToCurrentUserStartup();
+            }
+            NotifyUserBalloon(_trayIcon, "Startup enabled");
+            Console.WriteLine("Startup enabled");
         }
         private void DisableAppStartup(object sender, EventArgs args)
         {
-            _startupManager.Disable();
+            if (StartUpManager.IsUserAdministrator())
+            {
+                StartUpManager.RemoveApplicationFromAllUserStartup();
+            }
+            else
+            {
+                StartUpManager.RemoveApplicationFromCurrentUserStartup();
+            }
+            NotifyUserBalloon(_trayIcon, "Startup disabled");
+            Console.WriteLine("Startup disabled");
         }
     }
 }
