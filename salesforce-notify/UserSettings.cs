@@ -11,6 +11,12 @@ namespace salesforce_fileagent
             get { return (string)(this["Port"]); }
             set { this["Port"] = value; }
         }
-
+        [UserScopedSetting()]
+        [DefaultSettingValue("SFFM")]
+        public string CertName
+        {
+            get { return (string)(this["CertName"]); }
+            set { this["CertName"] = value; }
+        }
     }
 }
