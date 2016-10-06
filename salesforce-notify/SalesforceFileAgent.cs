@@ -5,6 +5,8 @@ using System.IO;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
 using salesforce_fileagent.Properties;
@@ -19,19 +21,13 @@ namespace salesforce_fileagent
         public SalesforceFileAgent()
         {
             InitializeComponent();
-            if (!IsUserAdministrator())
-            {
-                NotifyUserBalloon(_trayIcon, "Please run  as administrator");
-                _trayIcon.Visible = false;
-                Application.Exit();
-                return;
-            }
             _userSettings = new UserSettings();
             _server = new Server($"{ConfigurationManager.AppSettings["listner-prefix"]}:{_userSettings.Port}/");
             SetupCertificate(_userSettings);
             _server.Start(listnerContext =>
             {
-                Console.WriteLine("request " + listnerContext.Request);
+                Console.WriteLine($"request [{listnerContext.Request.RawUrl}]");
+                if (listnerContext.Request.RawUrl.Contains("favicon")) return;
                 HttpListenerRequest request = listnerContext.Request;
                 var urlKeyValueParameters = request.Url.ParseQueryString();
                 string path, pathOrigin = null;
@@ -106,14 +102,36 @@ namespace salesforce_fileagent
         {
             var certName = userSettings.CertName;
             var store = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.ReadWrite);
-            var existingCert = store.Certificates.Find(X509FindType.FindBySubjectName, certName, false);
-            if (existingCert.Count == 0)
+            try
             {
-                X509V3CertificateManager.SetUpCertificate(userSettings.CertName, "localhost", userSettings.Port);
+                store.Open(OpenFlags.ReadWrite);
+                var existingCert = store.Certificates.Find(X509FindType.FindBySubjectName, certName, false);
+                if (existingCert.Count == 0)
+                {
+                    X509V3CertificateManager.SetUpCertificate(
+                        userSettings.CertName, "localhost", ConfigurationManager.AppSettings["port"]);
+                }
+                store.Close();
             }
-            store.Close();
+            catch (Exception exception) when (!IsUserAdministrator())
+            {
+                Task.Factory.StartNew(() =>
+                {
+                    Console.WriteLine($"Permission denied. \n{exception.Message}");
+                    NotifyUserBalloon(_trayIcon, "Please run  as administrator");
+                    Thread.Sleep(2000);
+                    _trayIcon.Visible = false;
+                    Environment.Exit(0);
+                });
+                Console.WriteLine();
+            }
+            finally
+            {
+                store.Close();
+            }
+
         }
+
         private void ToggleServerStatus(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left)
@@ -213,23 +231,23 @@ namespace salesforce_fileagent
             Console.WriteLine("Startup disabled");
         }
         public bool IsUserAdministrator()
+        {
+            bool isAdmin;
+            try
             {
-                bool isAdmin;
-                try
-                {
-                    WindowsIdentity user = WindowsIdentity.GetCurrent();
-                    WindowsPrincipal principal = new WindowsPrincipal(user);
-                    isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    isAdmin = false;
-                }
-                catch (Exception ex)
-                {
-                    isAdmin = false;
-                }
-                return isAdmin;
+                WindowsIdentity user = WindowsIdentity.GetCurrent();
+                WindowsPrincipal principal = new WindowsPrincipal(user);
+                isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                isAdmin = false;
+            }
+            catch (Exception ex)
+            {
+                isAdmin = false;
+            }
+            return isAdmin;
         }
+    }
 }

@@ -1,17 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
 using System.Security.Cryptography;
 using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.Pkcs;
 using Org.BouncyCastle.Asn1.X509;
-using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Security;
@@ -54,6 +47,7 @@ namespace salesforce_fileagent
             }
             try
             {
+                System.Diagnostics.Process.Start(exeToRun, $"delete ssl -i 0.0.0.0:{port}");
                 System.Diagnostics.Process.Start(exeToRun, $"set ssl -i 0.0.0.0:{port} -h {hashString}");
 
             }
