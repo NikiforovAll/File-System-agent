@@ -18,5 +18,12 @@ namespace salesforce_fileagent
             get { return (string)(this["CertName"]); }
             set { this["CertName"] = value; }
         }
+        [UserScopedSetting()]
+        [DefaultSettingValue("false")]
+        public bool CertificateEnabled
+        {
+            get { return (bool)(this["CertificateEnabled"]); }
+            set { this["CertificateEnabled"] = value; }
+        }
     }
 }

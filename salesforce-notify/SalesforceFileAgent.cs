@@ -10,47 +10,30 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
 using salesforce_fileagent.Properties;
+using System.Diagnostics;
 
 namespace salesforce_fileagent
 {
     public class SalesforceFileAgent : ApplicationContext
     {
         private NotifyIcon _trayIcon;
-        private readonly Server _server;
-        private readonly UserSettings _userSettings;
+        private Server _server;
+        private UserSettings _userSettings;
+        const int TRAY_WIDTH = 120;
+        const int TRAY_HEIGHT = 88;
         public SalesforceFileAgent()
         {
+            //UI exceptions 
+            Application.ThreadException += ErrorLoggerUI;
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            // app wise exceptions 
+            AppDomain.CurrentDomain.UnhandledException += ErrorLogger;
             InitializeComponent();
-            _userSettings = new UserSettings();
-            _server = new Server($"{ConfigurationManager.AppSettings["listner-prefix"]}:{_userSettings.Port}/");
-            SetupCertificate(_userSettings);
-            _server.Start(listnerContext =>
-            {
-                Console.WriteLine($"request [{listnerContext.Request.RawUrl}]");
-                if (listnerContext.Request.RawUrl.Contains("favicon")) return;
-                HttpListenerRequest request = listnerContext.Request;
-                var urlKeyValueParameters = request.Url.ParseQueryString();
-                string path, pathOrigin = null;
-                if (!urlKeyValueParameters.TryGetValue("path", out path))
-                {
-                    path = "Parameter \"path\" was not found...";
-                }
-                else
-                {
-                    var operationResult = OpenFileSystemItem(path);
-                    path = operationResult.Item1;
-                    pathOrigin = operationResult.Item2;
-                }
-                listnerContext.Response.StatusCode = 200;
-                listnerContext.Response.Close();
-                NotifyUserBalloon(_trayIcon, $"{pathOrigin} {path}");
-            });
+            InitializeServer();
         }
 
         private void InitializeComponent()
         {
-            const int TRAY_WIDTH = 120;
-            const int TRAY_HEIGHT = 88;
             var contextMenuStrip = new ContextMenuStrip
             {
                 Items =
@@ -94,7 +77,6 @@ namespace salesforce_fileagent
                 Visible = true,
                 ContextMenuStrip = contextMenuStrip
             };
-            //            _startupManager = new StartupManager(ConfigurationManager.AppSettings["salesforce-fileagent"]);
             _trayIcon.MouseClick += ToggleServerStatus;
         }
 
@@ -110,10 +92,11 @@ namespace salesforce_fileagent
                 {
                     X509V3CertificateManager.SetUpCertificate(
                         userSettings.CertName, "localhost", ConfigurationManager.AppSettings["port"]);
+                    userSettings.CertificateEnabled = true;
                 }
                 store.Close();
             }
-            catch (Exception exception) when (!IsUserAdministrator())
+            catch (Exception exception) when (!IsUserAdministrator() && !userSettings.CertificateEnabled)
             {
                 Task.Factory.StartNew(() =>
                 {
@@ -123,27 +106,42 @@ namespace salesforce_fileagent
                     _trayIcon.Visible = false;
                     Environment.Exit(0);
                 });
-                Console.WriteLine();
             }
             finally
             {
                 store.Close();
+                userSettings.Save();
             }
 
         }
 
-        private void ToggleServerStatus(object sender, MouseEventArgs e)
+        private void InitializeServer()
         {
-            if (e.Button != MouseButtons.Left)
-                return;
-            if (_server.IsRunning)
+            _userSettings = new UserSettings();
+            _server = new Server($"{ConfigurationManager.AppSettings["listner-prefix"]}:{_userSettings.Port}/");
+            SetupCertificate(_userSettings);
+            _server.Start(listnerContext =>
             {
-                StopServer(sender, e);
-            }
-            else
-            {
-                StartServer(sender, e);
-            }
+                Console.WriteLine($"request [{listnerContext.Request.RawUrl}]");
+                if (listnerContext.Request.RawUrl.Contains("favicon")) return;
+                HttpListenerRequest request = listnerContext.Request;
+                var urlKeyValueParameters = request.Url.ParseQueryString();
+                string path, pathOrigin = null;
+                if (!urlKeyValueParameters.TryGetValue("path", out path))
+                {
+                    path = "Parameter \"path\" was not found...";
+                }
+                else
+                {
+                    var operationResult = OpenFileSystemItem(path);
+                    path = operationResult.Item1;
+                    pathOrigin = operationResult.Item2;
+                }
+                listnerContext.Response.StatusCode = 200;
+                listnerContext.Response.Close();
+                NotifyUserBalloon(_trayIcon, $"{pathOrigin} {path}");
+            });
+
         }
 
         private void NotifyUserBalloon(NotifyIcon icon, string text)
@@ -152,7 +150,18 @@ namespace salesforce_fileagent
             icon.BalloonTipIcon = ToolTipIcon.Info;
             icon.ShowBalloonTip(500);
         }
-
+        private bool IsFileSystemItemExists(out string type, string path)
+        {
+            path = path
+                .Replace("\"", "")
+                .Replace("/", "");
+            type = File.Exists(path)
+                         ? "File"
+                         : Directory.Exists(path)
+                             ? "Directory"
+                             : "";
+            return !type.Equals(String.Empty);
+        }
         private Tuple<string, string> OpenFileSystemItem(string path)
         {
             string pathOrigin;
@@ -173,37 +182,42 @@ namespace salesforce_fileagent
             }
             return new Tuple<string, string>(path, pathOrigin);
         }
-        private bool IsFileSystemItemExists(out string type, string path)
+        private bool IsUserAdministrator()
         {
-            path = path
-                .Replace("\"", "")
-                .Replace("/", "");
-            type = File.Exists(path)
-                         ? "File"
-                         : Directory.Exists(path)
-                             ? "Directory"
-                             : "";
-            return !type.Equals(String.Empty);
+            bool isAdmin;
+            try
+            {
+                WindowsIdentity user = WindowsIdentity.GetCurrent();
+                WindowsPrincipal principal = new WindowsPrincipal(user);
+                isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                isAdmin = false;
+            }
+            catch (Exception exception)
+            {
+                isAdmin = false;
+            }
+            return isAdmin;
         }
+        // logger 
+        private void ErrorLoggerUI(object sender, EventArgs args)
+        {
+        }
+
+        private void ErrorLogger(object sender, UnhandledExceptionEventArgs e)
+        {
+            Trace.TraceError($"{DateTime.Now} + {(e.ExceptionObject as Exception)}");
+            NotifyUserBalloon(_trayIcon, "Error! App will be closed");
+        }
+
         private void Exit(object sender, EventArgs args)
         {
             _trayIcon.Visible = false;
             _userSettings.Save();
             Application.Exit();
         }
-
-        private void StartServer(object sender, EventArgs args)
-        {
-            if (!_server.IsRunning)
-                _trayIcon.Icon = Resources.AppIcon;
-            _server.Start();
-        }
-        private void StopServer(object sender, EventArgs args)
-        {
-            _trayIcon.Icon = Resources.logo_r;
-            _server.Stop();
-        }
-
         private void EnableAppStartup(object sender, EventArgs args)
         {
             if (StartUpManager.IsUserAdministrator())
@@ -230,24 +244,29 @@ namespace salesforce_fileagent
             NotifyUserBalloon(_trayIcon, "Startup disabled");
             Console.WriteLine("Startup disabled");
         }
-        public bool IsUserAdministrator()
+        private void ToggleServerStatus(object sender, MouseEventArgs e)
         {
-            bool isAdmin;
-            try
+            if (e.Button != MouseButtons.Left)
+                return;
+            if (_server.IsRunning)
             {
-                WindowsIdentity user = WindowsIdentity.GetCurrent();
-                WindowsPrincipal principal = new WindowsPrincipal(user);
-                isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+                StopServer(sender, e);
             }
-            catch (UnauthorizedAccessException ex)
+            else
             {
-                isAdmin = false;
+                StartServer(sender, e);
             }
-            catch (Exception ex)
-            {
-                isAdmin = false;
-            }
-            return isAdmin;
+        }
+        private void StartServer(object sender, EventArgs args)
+        {
+            if (!_server.IsRunning)
+                _trayIcon.Icon = Resources.AppIcon;
+            _server.Start();
+        }
+        private void StopServer(object sender, EventArgs args)
+        {
+            _trayIcon.Icon = Resources.logo_r;
+            _server.Stop();
         }
     }
 }
