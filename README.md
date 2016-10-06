@@ -1,4 +1,4 @@
-## SF file agent 
+## file agent 
 Simple winforms tray-app. Listens on 8125 port (default). :octocat:
 Example: 
 ```
